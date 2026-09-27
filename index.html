@@ -8,17 +8,21 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@stlite/browser@0.76.0/build/stlite.css"
+      href="https://cdn.jsdelivr.net/npm/@stlite/browser@1.9.2/build/stlite.css"
     />
     <style>
       body, html {
         margin: 0;
         padding: 0;
+        width: 100%;
         height: 100%;
         background-color: #0E1117;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       }
-      #loading {
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+      #boot {
         position: fixed;
         inset: 0;
         display: flex;
@@ -29,6 +33,10 @@
         color: #F8FAFC;
         z-index: 9999;
         transition: opacity 0.4s ease;
+      }
+      #boot.boot-done {
+        opacity: 0;
+        pointer-events: none;
       }
       .spinner {
         width: 48px;
@@ -42,7 +50,7 @@
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
-      .loading-title {
+      .boot-title {
         font-size: 1.25rem;
         font-weight: 700;
         background: linear-gradient(135deg, #6366F1, #A855F7, #EC4899);
@@ -50,17 +58,53 @@
         -webkit-text-fill-color: transparent;
         margin-bottom: 8px;
       }
-      .loading-desc {
+      .boot-status {
         font-size: 0.9rem;
         color: #94A3B8;
+        max-width: 90vw;
+        text-align: center;
+        line-height: 1.6;
+      }
+      .boot-status.boot-error {
+        color: #F87171;
+      }
+      #boot.boot-error .spinner {
+        display: none;
+      }
+      .boot-hint {
+        margin-top: 18px;
+        font-size: 0.78rem;
+        color: #64748B;
+        max-width: 90vw;
+        text-align: center;
+        line-height: 1.6;
+      }
+      #boot details {
+        margin-top: 18px;
+        max-width: 90vw;
+        text-align: left;
+        font-size: 0.78rem;
+        color: #94A3B8;
+      }
+      #boot pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 10px;
+        padding: 12px;
+        max-height: 40vh;
+        overflow: auto;
+        color: #FCA5A5;
       }
     </style>
   </head>
   <body>
-    <div id="loading">
+    <div id="boot">
       <div class="spinner"></div>
-      <div class="loading-title">AchievePulse • Initializing App</div>
-      <div class="loading-desc" id="loading-status">Loading Python WebAssembly runtime & packages...</div>
+      <div class="boot-title">AchievePulse &bull; Initializing App</div>
+      <div class="boot-status" id="boot-status">Loading Python WebAssembly runtime &amp; packages&hellip;</div>
+      <div class="boot-hint" id="boot-hint">First load downloads ~10&nbsp;MB of Pyodide plus the chart libraries. This can take up to a minute on a slow connection.</div>
     </div>
     <div id="root"></div>
 
@@ -1003,32 +1047,139 @@ if __name__ == "__main__":
 </script>
 
     <script type="module">
-      import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.76.0/build/stlite.js";
+      const bootEl = document.getElementById("boot");
+      const statusEl = document.getElementById("boot-status");
+      const hintEl = document.getElementById("boot-hint");
+
+      let bootSettled = false;
+      let firstRendered = false;
+
+      function setStatus(message) {
+        if (statusEl) statusEl.textContent = message;
+      }
+
+      function fail(message, detail) {
+        if (bootSettled) return;
+        bootSettled = true;
+        if (bootEl) bootEl.classList.add("boot-error");
+        setStatus(message);
+        if (hintEl) hintEl.remove();
+        if (detail !== undefined && bootEl) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = "Technical details";
+          const pre = document.createElement("pre");
+          pre.textContent =
+            typeof detail === "string" ? detail : String(detail && (detail.stack || detail.message) || detail);
+          details.appendChild(summary);
+          details.appendChild(pre);
+          bootEl.appendChild(details);
+        }
+      }
+
+      function succeed() {
+        if (bootSettled || firstRendered) return;
+        firstRendered = true;
+        if (hintEl) hintEl.remove();
+        setStatus("Ready");
+        if (!bootEl) return;
+        bootEl.classList.add("boot-done");
+        setTimeout(() => bootEl.remove(), 450);
+      }
+
+      // Surface failures that happen outside the mount() call itself, otherwise
+      // they are swallowed and the boot overlay sits there forever.
+      window.addEventListener("unhandledrejection", (event) => {
+        fail("Startup failed before the app finished loading.", event.reason);
+      });
+      window.addEventListener("error", (event) => {
+        if (event.message && /Script error/i.test(event.message)) {
+          fail("Startup failed before the app finished loading.", event.message);
+        }
+      });
 
       const rawCode = document.getElementById("st-app-code").textContent;
 
-      mount(
-        {
-          entrypoint: "streamlit_app.py",
-          files: {
-            "streamlit_app.py": rawCode,
-          },
-          requirements: ["pandas", "plotly"],
-        },
-        document.getElementById("root"),
-      ).then(() => {
-        const loading = document.getElementById("loading");
-        if (loading) {
-          loading.style.opacity = "0";
-          setTimeout(() => loading.remove(), 400);
+      // A static import would fail silently (module load errors do not reach
+      // window.onerror), leaving the overlay spinning forever. A dynamic
+      // import rejects, so a CDN or network failure becomes a real error.
+      let mount;
+      try {
+        ({ mount } = await import("https://cdn.jsdelivr.net/npm/@stlite/browser@1.9.2/build/stlite.js"));
+      } catch (err) {
+        fail(
+          "Could not download the application runtime from the CDN.",
+          (err && (err.stack || err.message)) || err
+        );
+      }
+
+      if (mount) {
+        try {
+          // mount() is synchronous and returns a controller object -- it is NOT
+          // a thenable. Readiness has to be tracked via the kernel's events.
+          const controller = mount(
+            {
+              entrypoint: "streamlit_app.py",
+              files: {
+                "streamlit_app.py": rawCode,
+              },
+              requirements: ["pandas", "plotly"],
+            },
+            document.getElementById("root")
+          );
+
+          const kernel = controller && controller._kernel;
+          if (kernel && typeof kernel.addEventListener === "function") {
+            // stlite puts the payload straight on event.detail (not nested).
+            kernel.addEventListener("loadProgress", (event) => {
+              const message = event && event.detail;
+              if (typeof message === "string" && message && !bootSettled) setStatus(message);
+            });
+            kernel.addEventListener("loadError", (event) => {
+              fail("The Python runtime failed to load.", event && event.detail);
+            });
+            // loadFinished fires once Pyodide, the packages and the entrypoint
+            // are installed. That is the expensive part, so the overlay can go
+            // away shortly after this.
+            kernel.addEventListener("loadFinished", () => {
+              setStatus("Rendering app\u2026");
+              setTimeout(() => succeed(), 1200);
+            });
+          }
+
+          // Secondary, stlite-version-independent signal: Streamlit only emits
+          // these once the Python script has actually produced output. The app
+          // shell mounts within ~300ms, so its presence alone proves nothing.
+          const RENDERED = [
+            "[data-testid='stMarkdownContainer']",
+            "[data-testid='stTextInput']",
+            "[data-testid='stButton']",
+            "input",
+            "button",
+          ].join(",");
+          const observer = new MutationObserver(() => {
+            if (document.querySelector(RENDERED)) {
+              observer.disconnect();
+              succeed();
+            }
+          });
+          observer.observe(document.getElementById("root"), { childList: true, subtree: true });
+
+          // Hard stop so a stalled CDN request can never leave this on screen.
+          setTimeout(() => {
+            observer.disconnect();
+            if (!bootSettled) {
+              fail(
+                "Timed out while loading the Python runtime.",
+                "The Stlite kernel neither finished loading nor reported an error. " +
+                  "This usually means a network or CDN request stalled."
+              );
+            }
+          }, 180000);
+        } catch (err) {
+          fail("Failed to start the application.", err);
         }
-      }).catch((err) => {
-        const status = document.getElementById("loading-status");
-        if (status) {
-          status.style.color = "#EF4444";
-          status.textContent = "Error launching app: " + err.message;
-        }
-      });
+      }
     </script>
   </body>
 </html>

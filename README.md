@@ -95,10 +95,12 @@ A full-featured, modern web application built with **Python**, **Streamlit**, an
 ## ⚡ Deployment Options
 
 ### Option 1: Deploy on Vercel (Instant Browser Wasm via Stlite)
-This project is configured with `index.html` using **Stlite** (Streamlit compiled to WebAssembly via Pyodide), allowing it to deploy directly to Vercel as a fast, zero-server static site:
+This project is deployed as a **fully static site**. `index.html` inlines the entire Python application and loads its assets from a CDN, so there is no server or serverless function in the request path:
 1. Connect your GitHub repository to [Vercel](https://vercel.com/).
 2. Keep default settings (Framework preset: `Other`, Root Directory: `./`).
-3. Click **Deploy** — Vercel serves the app globally via CDN with zero server configuration!
+3. Click **Deploy** — Vercel serves `index.html` globally via CDN!
+
+> **Note:** In the browser (Wasm) build there is no Python server behind the app, so `st.download_button` cannot work — the JSON export only works in the Streamlit deployments below. The in-page data is still fully usable.
 
 ### Option 2: Deploy for Free on Streamlit Community Cloud
 Streamlit Community Cloud provides native containerized Python hosting with live backend WebSockets:
@@ -113,10 +115,27 @@ Streamlit Community Cloud provides native containerized Python hosting with live
 
 ```text
 to-do-list--/
-├── streamlit_app.py    # Main Streamlit web application
-├── index.html          # WebAssembly (Stlite) runner for static hosting (Vercel)
-├── vercel.json         # Vercel configuration
+├── streamlit_app.py    # Single source of truth for the application logic
+├── index.html          # Static Vercel build: inlines the same Python + Stlite/Wasm runner
+├── app.py              # Local-only shim so `streamlit run app.py` works
 ├── requirements.txt    # Python dependencies (streamlit, pandas, plotly)
 └── README.md           # Documentation & deployment guide
+```
+
+### Keeping the two copies of the app in sync
+`index.html` embeds a copy of `streamlit_app.py` inside a
+`<script type="text/python">` block so the page is self-contained. The two must
+stay identical. After editing the Python, re-embed it:
+
+```bash
+python3 - <<'PY'
+import re, pathlib
+p = pathlib.Path("index.html")
+html = p.read_text()
+app = pathlib.Path("streamlit_app.py").read_text().strip()
+m = re.search(r'(<script type="text/python" id="st-app-code">)(.*?)(</script>)', html, re.S)
+p.write_text(html[:m.start(2)] + app + "\n" + html[m.end(2):])
+print("re-embedded", len(app), "chars")
+PY
 ```
 
