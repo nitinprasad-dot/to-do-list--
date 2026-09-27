@@ -117,10 +117,17 @@ Streamlit Community Cloud provides native containerized Python hosting with live
 to-do-list--/
 ├── streamlit_app.py    # Single source of truth for the application logic
 ├── index.html          # Static Vercel build: inlines the same Python + Stlite/Wasm runner
-├── app.py              # Local-only shim so `streamlit run app.py` works
 ├── requirements.txt    # Python dependencies (streamlit, pandas, plotly)
 └── README.md           # Documentation & deployment guide
 ```
+
+> **Do not add a reserved entrypoint filename at the project root.** Vercel builds a
+> root-level `app.py`, `index.py`, `server.py`, `main.py`, `wsgi.py`, or `asgi.py` as
+> a Python serverless function, and the build fails unless that file exports a
+> top-level `app` / `application` / `handler`. `index.html` needs no server, so the
+> repo intentionally ships none of those names. `streamlit_app.py` is a non-reserved
+> filename and is ignored by Vercel. `requirements.txt` exists only for the local
+> and Streamlit Cloud setups.
 
 ### Keeping the two copies of the app in sync
 `index.html` embeds a copy of `streamlit_app.py` inside a
