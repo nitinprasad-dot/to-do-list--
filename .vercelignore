@@ -1,0 +1,10 @@
+# The browser build has no server, so Vercel has no reason to install Python.
+#
+# Without this, the presence of requirements.txt makes Vercel treat the repo as a
+# Python project and it then fails the build demanding a WSGI/ASGI entrypoint
+# (app.py / index.py / server.py / main.py / wsgi.py / asgi.py).
+#
+# requirements.txt is still committed and is what `pip install -r requirements.txt`
+# uses locally and what Streamlit Community Cloud reads. It is only hidden from
+# the Vercel build.
+requirements.txt

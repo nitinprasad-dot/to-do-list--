@@ -117,17 +117,24 @@ Streamlit Community Cloud provides native containerized Python hosting with live
 to-do-list--/
 ├── streamlit_app.py    # Single source of truth for the application logic
 ├── index.html          # Static Vercel build: inlines the same Python + Stlite/Wasm runner
+├── vercel.json         # Declares a static-only build (no serverless function)
+├── .vercelignore       # Hides requirements.txt from the Vercel build
 ├── requirements.txt    # Python dependencies (streamlit, pandas, plotly)
 └── README.md           # Documentation & deployment guide
 ```
 
-> **Do not add a reserved entrypoint filename at the project root.** Vercel builds a
-> root-level `app.py`, `index.py`, `server.py`, `main.py`, `wsgi.py`, or `asgi.py` as
-> a Python serverless function, and the build fails unless that file exports a
-> top-level `app` / `application` / `handler`. `index.html` needs no server, so the
-> repo intentionally ships none of those names. `streamlit_app.py` is a non-reserved
-> filename and is ignored by Vercel. `requirements.txt` exists only for the local
-> and Streamlit Cloud setups.
+### Why the deployment is configured this way
+The browser build is a **pure static site** — `index.html` inlines the whole app and
+loads its assets from a CDN, so Vercel has no Python to build or run. Two things
+otherwise make Vercel treat this repo as a Python project and fail the build:
+
+| Trigger | Fix |
+| --- | --- |
+| A root-level `app.py` / `index.py` / `server.py` / `main.py` / `wsgi.py` / `asgi.py` becomes a serverless function that must export `app` / `application` / `handler` | Don't use those filenames at the root. `streamlit_app.py` is not reserved. |
+| `requirements.txt` makes Vercel detect a Python project, so it demands an entrypoint even when none exists | `vercel.json` pins the build to `@vercel/static`, and `.vercelignore` hides `requirements.txt` from the build |
+
+`requirements.txt` stays committed — it is what `pip install -r requirements.txt`
+uses locally and what Streamlit Community Cloud reads. It is only hidden from Vercel.
 
 ### Keeping the two copies of the app in sync
 `index.html` embeds a copy of `streamlit_app.py` inside a
