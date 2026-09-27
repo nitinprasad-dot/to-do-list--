@@ -84,7 +84,7 @@ A full-featured, modern web application built with **Python**, **Streamlit**, an
 
 4. **Launch the Application**:
    ```bash
-   streamlit run app.py
+   streamlit run streamlit_app.py
    ```
 
 5. **Open in Your Browser**:
@@ -92,40 +92,31 @@ A full-featured, modern web application built with **Python**, **Streamlit**, an
 
 ---
 
-## ☁️ How to Deploy for Free on Streamlit Community Cloud
+## ⚡ Deployment Options
 
-Streamlit Community Cloud allows you to host Python applications for free with automated deployments from GitHub.
+### Option 1: Deploy on Vercel (Instant Browser Wasm via Stlite)
+This project is configured with `index.html` using **Stlite** (Streamlit compiled to WebAssembly via Pyodide), allowing it to deploy directly to Vercel as a fast, zero-server static site:
+1. Connect your GitHub repository to [Vercel](https://vercel.com/).
+2. Keep default settings (Framework preset: `Other`, Root Directory: `./`).
+3. Click **Deploy** — Vercel serves the app globally via CDN with zero server configuration!
 
-### Step 1: Push Code to GitHub
-1. Initialize a git repository in the project folder:
-   ```bash
-   git init
-   git add app.py requirements.txt README.md
-   git commit -m "Initial commit of Personal Goal and Task Tracker"
-   ```
-2. Create a new public repository on [GitHub](https://github.com/new) (e.g., `personal-goal-tracker`).
-3. Push your repository:
-   ```bash
-   git remote add origin https://github.com/<your-username>/personal-goal-tracker.git
-   git branch -M main
-   git push -u origin main
-   ```
-
-### Step 2: Connect to Streamlit Community Cloud
+### Option 2: Deploy for Free on Streamlit Community Cloud
+Streamlit Community Cloud provides native containerized Python hosting with live backend WebSockets:
 1. Visit [share.streamlit.io](https://share.streamlit.io/) and sign in with your GitHub account.
 2. Click **"New app"**.
-3. Select your repository (`<your-username>/personal-goal-tracker`), branch (`main`), and main file path (`app.py`).
+3. Select your repository, branch (`main`), and set the main file path to `streamlit_app.py`.
 4. Click **"Deploy!"**.
-
-Streamlit Cloud will install dependencies from `requirements.txt` and launch your live application at `https://<your-app-name>.streamlit.app` in under 2 minutes.
 
 ---
 
 ## 📁 Project Structure
 
 ```text
-personal-goal-tracker/
-├── app.py              # Main Streamlit web application
-├── requirements.txt    # Project dependencies (streamlit, pandas, plotly)
+to-do-list--/
+├── streamlit_app.py    # Main Streamlit web application
+├── index.html          # WebAssembly (Stlite) runner for static hosting (Vercel)
+├── vercel.json         # Vercel configuration
+├── requirements.txt    # Python dependencies (streamlit, pandas, plotly)
 └── README.md           # Documentation & deployment guide
 ```
+
