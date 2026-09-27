@@ -1,0 +1,21 @@
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Streamlit config / cache
+.streamlit/
+*/.streamlit/
+
+# macOS metadata
+.DS_Store
+
+# IDE / System
+.vscode/
+.idea/
